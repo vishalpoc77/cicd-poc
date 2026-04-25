@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_HUB_REPO = 'yourdockerhubuser/sample-app'
+        DOCKER_HUB_REPO = 'vishaldocker77/sample-app'
         DOCKER_CREDENTIALS = credentials('docker-hub-creds')
         IMAGE_TAG = "${BUILD_NUMBER}"
     }
@@ -12,7 +12,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 git branch: 'main',
-                    url: 'https://github.com/your-org/your-repo.git'
+                    url: 'https://github.com/vishalpoc77/cicd-poc.git' 
                 echo "Code checked out at commit: ${GIT_COMMIT}"
             }
         }
