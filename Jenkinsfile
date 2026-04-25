@@ -20,16 +20,20 @@ pipeline {
         stage('Build') {
             steps {
                 sh "docker build -t ${DOCKER_HUB_REPO}:${IMAGE_TAG} ."
-                sh "docker tag ${DOCKER_HUB_REPO}:${IMAGE_TAG} ${DOCKER_HUB_REPO}:latest"
+                sh "docker tag  ${DOCKER_HUB_REPO}:${IMAGE_TAG} \
+                                ${DOCKER_HUB_REPO}:latest"
+                echo " Docker image built: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
             }
         }
 
         stage('Test') {
             steps {
                 sh """
-                  docker run --rm ${DOCKER_HUB_REPO}:${IMAGE_TAG} \
+                  docker run --rm \
+                    ${DOCKER_HUB_REPO}:${IMAGE_TAG} \
                     sh -c 'npm test'
                 """
+                echo " Tests passed"
             }
         }
 
@@ -38,6 +42,7 @@ pipeline {
                 sh "echo ${DOCKER_CREDENTIALS_PSW} | docker login -u ${DOCKER_CREDENTIALS_USR} --password-stdin"
                 sh "docker push ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
                 sh "docker push ${DOCKER_HUB_REPO}:latest"
+                echo " Image pushed to Docker Hub"
             }
         }
 
@@ -53,6 +58,7 @@ pipeline {
                          docker run -d --name sample-app -p 80:3000 ${DOCKER_HUB_REPO}:latest'
                     """
                 }
+                echo " Deployed to EC2"
             }
         }
     }
