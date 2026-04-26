@@ -2,9 +2,12 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_HUB_REPO = 'vishaldocker77/sample-app'
+        DOCKER_HUB_REPO    = 'vishaldocker77/sample-app'
         DOCKER_CREDENTIALS = credentials('docker-hub-creds')
-        IMAGE_TAG = "${BUILD_NUMBER}"
+        IMAGE_TAG          = "${BUILD_NUMBER}"
+        K8S_DEPLOYMENT     = 'sample-app'
+        K8S_CONTAINER      = 'sample-app'
+        K8S_NAMESPACE      = 'default'
     }
 
     stages {
@@ -41,18 +44,27 @@ pipeline {
             }
         }
 
-        stage('Deploy') {
+        stage('Deploy to Kubernetes') {
             steps {
-                sshagent(['ec2-ssh-key']) {
-                    bat "ssh -o StrictHostKeyChecking=no ec2-user@YOUR_EC2_IP \"docker pull ${DOCKER_HUB_REPO}:latest && docker stop sample-app || true && docker rm sample-app || true && docker run -d --name sample-app -p 80:3000 ${DOCKER_HUB_REPO}:latest\""
+                // Inject kubeconfig from Jenkins credentials
+                withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
+
+                    // Apply the deployment manifest
+                    bat "kubectl apply -f k8s/deployment.yaml --kubeconfig=%KUBECONFIG%"
+
+                    // Update the image to the exact build tag (not just 'latest')
+                    bat "kubectl set image deployment/%K8S_DEPLOYMENT% %K8S_CONTAINER%=${DOCKER_HUB_REPO}:${IMAGE_TAG} --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
+
+                    // Wait for rollout to complete
+                    bat "kubectl rollout status deployment/%K8S_DEPLOYMENT% --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG% --timeout=120s"
                 }
-                echo "Deployed to EC2"
+                echo "Deployed to Kubernetes: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
             }
         }
     }
 
     post {
-        success { echo "Pipeline succeeded — build #${BUILD_NUMBER} deployed!" }
+        success { echo "Pipeline succeeded — build #${BUILD_NUMBER} deployed to Kubernetes!" }
         failure { echo "Pipeline failed — check logs above." }
         always  { bat "docker logout" }
     }
