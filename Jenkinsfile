@@ -44,27 +44,29 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Deploy to EKS') {
             steps {
-                // Inject kubeconfig from Jenkins credentials
                 withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
 
-                    // Apply the deployment manifest
+                    // Apply deployment manifest
                     bat "kubectl apply -f k8s/deployment.yaml --kubeconfig=%KUBECONFIG%"
 
-                    // Update the image to the exact build tag (not just 'latest')
+                    // Update image to exact build tag
                     bat "kubectl set image deployment/%K8S_DEPLOYMENT% %K8S_CONTAINER%=${DOCKER_HUB_REPO}:${IMAGE_TAG} --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
 
-                    // Wait for rollout to complete
-                    bat "kubectl rollout status deployment/%K8S_DEPLOYMENT% --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG% --timeout=120s"
+                    // Wait for rollout
+                    bat "kubectl rollout status deployment/%K8S_DEPLOYMENT% --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG% --timeout=180s"
+
+                    // Print the external IP
+                    bat "kubectl get service sample-app-service --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
                 }
-                echo "Deployed to Kubernetes: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
+                echo "Deployed to AWS EKS: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
             }
         }
     }
 
     post {
-        success { echo "Pipeline succeeded — build #${BUILD_NUMBER} deployed to Kubernetes!" }
+        success { echo "Pipeline succeeded — build #${BUILD_NUMBER} live on AWS EKS!" }
         failure { echo "Pipeline failed — check logs above." }
         always  { bat "docker logout" }
     }
