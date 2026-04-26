@@ -19,8 +19,8 @@ pipeline {
 
         stage('Build') {
             steps {
-                sh "docker build -t ${DOCKER_HUB_REPO}:${IMAGE_TAG} ."
-                sh "docker tag  ${DOCKER_HUB_REPO}:${IMAGE_TAG} \
+                bat "docker build -t ${DOCKER_HUB_REPO}:${IMAGE_TAG} ."
+                bat "docker tag  ${DOCKER_HUB_REPO}:${IMAGE_TAG} \
                                 ${DOCKER_HUB_REPO}:latest"
                 echo " Docker image built: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
             }
@@ -28,10 +28,10 @@ pipeline {
 
         stage('Test') {
             steps {
-                sh """
+                bat """
                   docker run --rm \
                     ${DOCKER_HUB_REPO}:${IMAGE_TAG} \
-                    sh -c 'npm test'
+                    bat -c 'npm test'
                 """
                 echo " Tests passed"
             }
@@ -39,9 +39,9 @@ pipeline {
 
         stage('Push Image') {
             steps {
-                sh "echo ${DOCKER_CREDENTIALS_PSW} | docker login -u ${DOCKER_CREDENTIALS_USR} --password-stdin"
-                sh "docker push ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
-                sh "docker push ${DOCKER_HUB_REPO}:latest"
+                bat "echo ${DOCKER_CREDENTIALS_PSW} | docker login -u ${DOCKER_CREDENTIALS_USR} --password-stdin"
+                bat "docker push ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
+                bat "docker push ${DOCKER_HUB_REPO}:latest"
                 echo " Image pushed to Docker Hub"
             }
         }
@@ -50,7 +50,7 @@ pipeline {
             steps {
                 // Option A: EC2
                 sshagent(['ec2-ssh-key']) {
-                    sh """
+                    bat """
                       ssh -o StrictHostKeyChecking=no ec2-user@YOUR_EC2_IP \
                         'docker pull ${DOCKER_HUB_REPO}:latest && \
                          docker stop sample-app || true && \
@@ -66,6 +66,6 @@ pipeline {
     post {
         success { echo "Pipeline succeeded — build #${BUILD_NUMBER} deployed!" }
         failure { echo "Pipeline failed — check logs above." }
-        always  { sh "docker logout" }
+        always  { bat "docker logout" }
     }
 }
