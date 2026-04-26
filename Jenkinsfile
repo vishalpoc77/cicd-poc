@@ -46,19 +46,33 @@ pipeline {
 
         stage('Deploy to EKS') {
             steps {
-                withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
+                // Inject both kubeconfig AND AWS credentials together
+                withCredentials([
+                    file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG'),
+                    string(credentialsId: 'aws-access-key-id',     variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
+                    // Set AWS credentials as env vars so kubectl → aws CLI can authenticate
+                    withEnv([
+                        "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}",
+                        "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}",
+                        "AWS_DEFAULT_REGION=ap-south-1"
+                    ]) {
+                        // Verify AWS identity first
+                        bat "aws sts get-caller-identity"
 
-                    // Apply deployment manifest
-                    bat "kubectl apply -f k8s/deployment.yaml --kubeconfig=%KUBECONFIG%"
+                        // Apply deployment manifest
+                        bat "kubectl apply -f k8s/deployment.yaml --kubeconfig=%KUBECONFIG%"
 
-                    // Update image to exact build tag
-                    bat "kubectl set image deployment/%K8S_DEPLOYMENT% %K8S_CONTAINER%=${DOCKER_HUB_REPO}:${IMAGE_TAG} --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
+                        // Update image to exact build tag
+                        bat "kubectl set image deployment/%K8S_DEPLOYMENT% %K8S_CONTAINER%=${DOCKER_HUB_REPO}:${IMAGE_TAG} --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
 
-                    // Wait for rollout
-                    bat "kubectl rollout status deployment/%K8S_DEPLOYMENT% --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG% --timeout=180s"
+                        // Wait for rollout to complete
+                        bat "kubectl rollout status deployment/%K8S_DEPLOYMENT% --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG% --timeout=180s"
 
-                    // Print the external IP
-                    bat "kubectl get service sample-app-service --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
+                        // Print external IP
+                        bat "kubectl get service sample-app-service --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
+                    }
                 }
                 echo "Deployed to AWS EKS: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
             }
