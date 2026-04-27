@@ -45,35 +45,37 @@ pipeline {
         }
 
         stage('Deploy to EKS') {
-            steps {
-                withCredentials([
-                    file(credentialsId: 'kubeconfig',              variable: 'KUBECONFIG'),
-                    string(credentialsId: 'aws-access-key-id',     variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY'),
-                ]) {
-                    withEnv([
-                        "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}",
-                        "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}",
-                        "AWS_DEFAULT_REGION=ap-south-1"
-                    ]) {
+    steps {
+        withCredentials([
+            file(credentialsId: 'kubeconfig',              variable: 'KUBECONFIG'),
+            string(credentialsId: 'aws-access-key-id',     variable: 'AWS_ACCESS_KEY_ID'),
+            string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY'),
+        ]) {
+            withEnv([
+                "AWS_DEFAULT_REGION=ap-south-1"
+            ]) {
+                bat "aws sts get-caller-identity"
 
-                        bat "aws sts get-caller-identity"
+                bat """
+                    kubectl create secret docker-registry dockerhub-secret ^
+                      --docker-server=https://index.docker.io/v1/ ^
+                      --docker-username=vishaldocker77 ^
+                      --docker-password=%DOCKER_CREDENTIALS_PSW% ^
+                      --namespace=default ^
+                      --kubeconfig=%KUBECONFIG% ^
+                      --dry-run=client -o yaml | kubectl apply -f - --kubeconfig=%KUBECONFIG%
+                """
 
-                        bat "kubectl create secret docker-registry dockerhub-secret --docker-server=https://index.docker.io/v1/ --docker-username=vishaldocker77 --docker-password=%DOCKER_CREDENTIALS_PSW% --namespace=default --kubeconfig=%KUBECONFIG% --dry-run=client -o yaml | kubectl apply -f - --kubeconfig=%KUBECONFIG%"
+                bat "kubectl apply -f k8s/deployment.yaml --kubeconfig=%KUBECONFIG%"
 
-                        bat "kubectl apply -f k8s/deployment.yaml --kubeconfig=%KUBECONFIG%"
+                bat "kubectl set image deployment/%K8S_DEPLOYMENT% %K8S_CONTAINER%=${DOCKER_HUB_REPO}:${IMAGE_TAG} --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
 
-                        bat "kubectl set image deployment/%K8S_DEPLOYMENT% %K8S_CONTAINER%=${DOCKER_HUB_REPO}:${IMAGE_TAG} --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
+                // This replaces the wait+rollout combo — it blocks until rollout completes or times out
+                bat "kubectl rollout status deployment/%K8S_DEPLOYMENT% --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG% --timeout=300s"
 
-                        bat "kubectl wait --for=delete pod -l app=sample-app --timeout=120s --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG% || echo Pods cleared"
-
-                        bat "kubectl rollout status deployment/%K8S_DEPLOYMENT% --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG% --timeout=300s"
-
-                        bat "kubectl get service sample-app-service --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
-                    }
-                }
-                echo "Deployed to AWS EKS: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
+                bat "kubectl get service sample-app-service --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
             }
         }
+        echo "Deployed to AWS EKS: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
     }
 }
