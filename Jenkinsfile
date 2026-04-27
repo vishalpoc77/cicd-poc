@@ -50,7 +50,6 @@ pipeline {
                     file(credentialsId: 'kubeconfig',              variable: 'KUBECONFIG'),
                     string(credentialsId: 'aws-access-key-id',     variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY'),
-                    string(credentialsId: 'dockerhub-password',    variable: 'DOCKERHUB_PASSWORD')
                 ]) {
                     withEnv([
                         "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}",
@@ -60,7 +59,7 @@ pipeline {
 
                         bat "aws sts get-caller-identity"
 
-                        bat "kubectl create secret docker-registry dockerhub-secret --docker-server=https://index.docker.io/v1/ --docker-username=vishaldocker77 --docker-password=%DOCKERHUB_PASSWORD% --namespace=default --kubeconfig=%KUBECONFIG% --dry-run=client -o yaml | kubectl apply -f - --kubeconfig=%KUBECONFIG%"
+                        bat "kubectl create secret docker-registry dockerhub-secret --docker-server=https://index.docker.io/v1/ --docker-username=vishaldocker77 --docker-password=%DOCKER_CREDENTIALS_PSW% --namespace=default --kubeconfig=%KUBECONFIG% --dry-run=client -o yaml | kubectl apply -f - --kubeconfig=%KUBECONFIG%"
 
                         bat "kubectl apply -f k8s/deployment.yaml --kubeconfig=%KUBECONFIG%"
 
