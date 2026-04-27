@@ -45,44 +45,40 @@ pipeline {
         }
 
         stage('Deploy to EKS') {
-            steps {
-                // Inject both kubeconfig AND AWS credentials together
-                withCredentials([
-                    file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG'),
-                    string(credentialsId: 'aws-access-key-id',     variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
-                ]) {
-                    // Set AWS credentials as env vars so kubectl → aws CLI can authenticate
-                    withEnv([
-                        "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}",
-                        "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}",
-                        "AWS_DEFAULT_REGION=ap-south-1"
-                    ]) {
-                        // Verify AWS identity first
-                        bat "aws sts get-caller-identity"
+    steps {
+        withCredentials([
+            file(credentialsId: 'kubeconfig',              variable: 'KUBECONFIG'),
+            string(credentialsId: 'aws-access-key-id',     variable: 'AWS_ACCESS_KEY_ID'),
+            string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY'),
+            string(credentialsId: 'dockerhub-password',    variable: 'DOCKERHUB_PASSWORD')
+        ]) {
+            withEnv([
+                "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}",
+                "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}",
+                "AWS_DEFAULT_REGION=ap-south-1"
+            ]) {
+                // Verify AWS identity
+                bat "aws sts get-caller-identity"
 
-                        // Apply deployment manifest
-                        bat "kubectl apply -f k8s/deployment.yaml --kubeconfig=%KUBECONFIG%"
+                // Create/update Docker Hub pull secret
+                bat "kubectl create secret docker-registry dockerhub-secret --docker-server=https://index.docker.io/v1/ --docker-username=vishaldocker77 --docker-password=%DOCKERHUB_PASSWORD% --namespace=default --kubeconfig=%KUBECONFIG% --dry-run=client -o yaml | kubectl apply -f - --kubeconfig=%KUBECONFIG%"
 
-                        // Update image to exact build tag
-                        bat "kubectl set image deployment/%K8S_DEPLOYMENT% %K8S_CONTAINER%=${DOCKER_HUB_REPO}:${IMAGE_TAG} --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
+                // Apply deployment
+                bat "kubectl apply -f k8s/deployment.yaml --kubeconfig=%KUBECONFIG%"
 
-                        // Wait for rollout to complete
-                        bat "kubectl rollout status deployment/%K8S_DEPLOYMENT% --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG% --timeout=300s"
-                        
-                        // Print external IP
-                        bat "kubectl get service sample-app-service --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
-                        
-                    }
-                }
-                echo "Deployed to AWS EKS: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
+                // Update image
+                bat "kubectl set image deployment/%K8S_DEPLOYMENT% %K8S_CONTAINER%=${DOCKER_HUB_REPO}:${IMAGE_TAG} --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
+
+                // Wait for old pods to terminate first
+                bat "kubectl wait --for=delete pod -l app=sample-app --timeout=120s --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG% || echo Pods cleared"
+
+                // Then check rollout status
+                bat "kubectl rollout status deployment/%K8S_DEPLOYMENT% --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG% --timeout=300s"
+
+                // Print service info
+                bat "kubectl get service sample-app-service --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
             }
         }
-    }
-
-    post {
-        success { echo "Pipeline succeeded — build #${BUILD_NUMBER} live on AWS EKS!" }
-        failure { echo "Pipeline failed — check logs above." }
-        always  { bat "docker logout" }
+        echo "Deployed to AWS EKS: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
     }
 }
