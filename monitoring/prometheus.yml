@@ -28,11 +28,11 @@ scrape_configs:
     static_configs:
       - targets: ['node-exporter:9100']
 
-  # Collect metrics from your app (if app exposes /metrics)
-  - job_name: 'sample-app'
-    scrape_interval: 15s
-    static_configs:
-      - targets: ['sample-app:3000']
+  # # Collect metrics from your app (if app exposes /metrics)
+  # - job_name: 'sample-app'
+  #   scrape_interval: 15s
+  #   static_configs:
+  #     - targets: ['sample-app:3000']
 
 
 
