@@ -1,6 +1,5 @@
 pipeline {
     agent any
-
     environment {
         DOCKER_HUB_REPO    = 'vishaldocker77/sample-app'
         DOCKER_CREDENTIALS = credentials('docker-hub-creds')
@@ -9,9 +8,7 @@ pipeline {
         K8S_CONTAINER      = 'sample-app'
         K8S_NAMESPACE      = 'default'
     }
-
     stages {
-
         stage('Checkout') {
             steps {
                 git branch: 'main',
@@ -19,7 +16,6 @@ pipeline {
                 echo "Code checked out at commit: ${GIT_COMMIT}"
             }
         }
-
         stage('Build') {
             steps {
                 bat "docker build -t ${DOCKER_HUB_REPO}:${IMAGE_TAG} ."
@@ -27,14 +23,12 @@ pipeline {
                 echo "Docker image built: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
             }
         }
-
         stage('Test') {
             steps {
                 bat "docker run --rm ${DOCKER_HUB_REPO}:${IMAGE_TAG} sh -c \"npm test\""
                 echo "Tests passed"
             }
         }
-
         stage('Push Image') {
             steps {
                 bat "docker login -u %DOCKER_CREDENTIALS_USR% -p %DOCKER_CREDENTIALS_PSW%"
@@ -43,39 +37,29 @@ pipeline {
                 echo "Image pushed to Docker Hub"
             }
         }
-
         stage('Deploy to EKS') {
-    steps {
-        withCredentials([
-            file(credentialsId: 'kubeconfig',              variable: 'KUBECONFIG'),
-            string(credentialsId: 'aws-access-key-id',     variable: 'AWS_ACCESS_KEY_ID'),
-            string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY'),
-        ]) {
-            withEnv([
-                "AWS_DEFAULT_REGION=ap-south-1"
-            ]) {
-                bat "aws sts get-caller-identity"
+            steps {
+                withCredentials([
+                    file(credentialsId: 'kubeconfig',             variable: 'KUBECONFIG'),
+                    string(credentialsId: 'aws-access-key-id',    variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'aws-secret-access-key',variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
+                    withEnv(["AWS_DEFAULT_REGION=ap-south-1"]) {
+                        bat "aws sts get-caller-identity"
 
-                bat """
-                    kubectl create secret docker-registry dockerhub-secret ^
-                      --docker-server=https://index.docker.io/v1/ ^
-                      --docker-username=vishaldocker77 ^
-                      --docker-password=%DOCKER_CREDENTIALS_PSW% ^
-                      --namespace=default ^
-                      --kubeconfig=%KUBECONFIG% ^
-                      --dry-run=client -o yaml | kubectl apply -f - --kubeconfig=%KUBECONFIG%
-                """
+                        bat "kubectl create secret docker-registry dockerhub-secret --docker-server=https://index.docker.io/v1/ --docker-username=vishaldocker77 --docker-password=%DOCKER_CREDENTIALS_PSW% --namespace=default --kubeconfig=%KUBECONFIG% --dry-run=client -o yaml | kubectl apply -f - --kubeconfig=%KUBECONFIG%"
 
-                bat "kubectl apply -f k8s/deployment.yaml --kubeconfig=%KUBECONFIG%"
+                        bat "kubectl apply -f k8s/deployment.yaml --kubeconfig=%KUBECONFIG%"
 
-                bat "kubectl set image deployment/%K8S_DEPLOYMENT% %K8S_CONTAINER%=${DOCKER_HUB_REPO}:${IMAGE_TAG} --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
+                        bat "kubectl set image deployment/%K8S_DEPLOYMENT% %K8S_CONTAINER%=${DOCKER_HUB_REPO}:${IMAGE_TAG} --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
 
-                // This replaces the wait+rollout combo — it blocks until rollout completes or times out
-                bat "kubectl rollout status deployment/%K8S_DEPLOYMENT% --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG% --timeout=300s"
+                        bat "kubectl rollout status deployment/%K8S_DEPLOYMENT% --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG% --timeout=300s"
 
-                bat "kubectl get service sample-app-service --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
+                        bat "kubectl get service sample-app-service --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
+                    }
+                }
+                echo "Deployed to AWS EKS: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
             }
         }
-        echo "Deployed to AWS EKS: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
     }
 }
