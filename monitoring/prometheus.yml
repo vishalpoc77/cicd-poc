@@ -1,7 +1,51 @@
 global:
-  scrape_interval: 15s
+  scrape_interval: 15s       # Collect metrics every 15 seconds
+  evaluation_interval: 15s   # Evaluate alert rules every 15 seconds
+
+# Alertmanager configuration (optional for now)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Scrape targets — where Prometheus collects metrics from
 scrape_configs:
+
+  # Prometheus monitors itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Collect container metrics from cAdvisor
   - job_name: 'cadvisor'
+    scrape_interval: 10s
     static_configs:
       - targets: ['cadvisor:8080']
+
+  # Collect host system metrics from Node Exporter
+  - job_name: 'node-exporter'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  # Collect metrics from your app (if app exposes /metrics)
+  - job_name: 'sample-app'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['sample-app:3000']
+
+
+
+
+
+
+
+
+
+# global:
+#   scrape_interval: 15s
+# scrape_configs:
+#   - job_name: 'cadvisor'
+#     static_configs:
+#       - targets: ['cadvisor:8080']
       
