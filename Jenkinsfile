@@ -45,40 +45,36 @@ pipeline {
         }
 
         stage('Deploy to EKS') {
-    steps {
-        withCredentials([
-            file(credentialsId: 'kubeconfig',              variable: 'KUBECONFIG'),
-            string(credentialsId: 'aws-access-key-id',     variable: 'AWS_ACCESS_KEY_ID'),
-            string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY'),
-            string(credentialsId: 'dockerhub-password',    variable: 'DOCKERHUB_PASSWORD')
-        ]) {
-            withEnv([
-                "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}",
-                "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}",
-                "AWS_DEFAULT_REGION=ap-south-1"
-            ]) {
-                // Verify AWS identity
-                bat "aws sts get-caller-identity"
+            steps {
+                withCredentials([
+                    file(credentialsId: 'kubeconfig',              variable: 'KUBECONFIG'),
+                    string(credentialsId: 'aws-access-key-id',     variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY'),
+                    string(credentialsId: 'dockerhub-password',    variable: 'DOCKERHUB_PASSWORD')
+                ]) {
+                    withEnv([
+                        "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}",
+                        "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}",
+                        "AWS_DEFAULT_REGION=ap-south-1"
+                    ]) {
 
-                // Create/update Docker Hub pull secret
-                bat "kubectl create secret docker-registry dockerhub-secret --docker-server=https://index.docker.io/v1/ --docker-username=vishaldocker77 --docker-password=%DOCKERHUB_PASSWORD% --namespace=default --kubeconfig=%KUBECONFIG% --dry-run=client -o yaml | kubectl apply -f - --kubeconfig=%KUBECONFIG%"
+                        bat "aws sts get-caller-identity"
 
-                // Apply deployment
-                bat "kubectl apply -f k8s/deployment.yaml --kubeconfig=%KUBECONFIG%"
+                        bat "kubectl create secret docker-registry dockerhub-secret --docker-server=https://index.docker.io/v1/ --docker-username=vishaldocker77 --docker-password=%DOCKERHUB_PASSWORD% --namespace=default --kubeconfig=%KUBECONFIG% --dry-run=client -o yaml | kubectl apply -f - --kubeconfig=%KUBECONFIG%"
 
-                // Update image
-                bat "kubectl set image deployment/%K8S_DEPLOYMENT% %K8S_CONTAINER%=${DOCKER_HUB_REPO}:${IMAGE_TAG} --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
+                        bat "kubectl apply -f k8s/deployment.yaml --kubeconfig=%KUBECONFIG%"
 
-                // Wait for old pods to terminate first
-                bat "kubectl wait --for=delete pod -l app=sample-app --timeout=120s --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG% || echo Pods cleared"
+                        bat "kubectl set image deployment/%K8S_DEPLOYMENT% %K8S_CONTAINER%=${DOCKER_HUB_REPO}:${IMAGE_TAG} --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
 
-                // Then check rollout status
-                bat "kubectl rollout status deployment/%K8S_DEPLOYMENT% --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG% --timeout=300s"
+                        bat "kubectl wait --for=delete pod -l app=sample-app --timeout=120s --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG% || echo Pods cleared"
 
-                // Print service info
-                bat "kubectl get service sample-app-service --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
+                        bat "kubectl rollout status deployment/%K8S_DEPLOYMENT% --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG% --timeout=300s"
+
+                        bat "kubectl get service sample-app-service --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
+                    }
+                }
+                echo "Deployed to AWS EKS: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
             }
         }
-        echo "Deployed to AWS EKS: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
     }
 }
