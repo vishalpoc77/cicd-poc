@@ -45,6 +45,12 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin123
       - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SMTP_ENABLED=true
+      - GF_SMTP_SKIP_VERIFY=true
+      - GF_SMTP_HOST=smtp.gmail.com:587
+      - GF_SMTP_USER=vishal.snyk@gmail.com
+      - GF_SMTP_PASSWORD=noho fzra wyzp qpjp
+      - GF_SMTP_FROM_ADDRESS=vishal.snyk@gmail.com
     volumes:
       - grafana_data:/var/lib/grafana
     depends_on:
