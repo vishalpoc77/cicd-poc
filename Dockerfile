@@ -1,7 +1,7 @@
 FROM node:18-alpine
 WORKDIR /app
 COPY app/package*.json ./
-RUN npm install --omit=production
+RUN npm install
 COPY app/ .
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s \
