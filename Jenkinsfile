@@ -68,10 +68,11 @@ pipeline {
                         bat "kubectl set image deployment/%K8S_DEPLOYMENT% %K8S_CONTAINER%=${DOCKER_HUB_REPO}:${IMAGE_TAG} --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
 
                         // Wait for rollout to complete
-                        bat "kubectl rollout status deployment/%K8S_DEPLOYMENT% --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG% --timeout=180s"
-
+                        bat "kubectl rollout status deployment/%K8S_DEPLOYMENT% --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG% --timeout=300s"
+                        
                         // Print external IP
                         bat "kubectl get service sample-app-service --namespace=%K8S_NAMESPACE% --kubeconfig=%KUBECONFIG%"
+                        
                     }
                 }
                 echo "Deployed to AWS EKS: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
