@@ -40,7 +40,13 @@ app.use((req, res, next) => {
 
 // ── Routes ────────────────────────────────────────
 app.get('/', (req, res) => {
-  res.json({ message: 'Hello from CI/CD Pipeline!' });
+  res.json({
+    status:  'success',
+    message: 'Sample App is running!',
+    version: process.env.IMAGE_TAG || '1.0.0',
+    environment: 'AWS EKS',
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.get('/health', (req, res) => {
@@ -70,14 +76,10 @@ app.listen(PORT, () => {
 
 
 
+
+
 // app.get('/', (req, res) => {
-//   res.json({
-//     status:  'success',
-//     message: 'Sample App is running!',
-//     version: process.env.IMAGE_TAG || '1.0.0',
-//     environment: 'AWS EKS',
-//     timestamp: new Date().toISOString()
-//   });
+//   res.json({ message: 'Hello from CI/CD Pipeline!' });
 // });
 
 // app.get('/health', (req, res) => {
